@@ -1,0 +1,298 @@
+(* Initialisation des modules*)
+#open "graphics";;	(* Graphique *)
+#open "sys";;		(* Système *)
+#open "random";;        (* Aléatoire *)
+
+let affiche_vect v =
+  let n = vect_length v in
+  for i = 0 to n - 1 do
+    print_int v.(i);
+    print_string " ";
+  done;
+  print_newline ();;
+
+(* Couleurs non pédéfinies *)
+let gris = rgb 220 220 220;;
+let bordeaux = rgb 128 0 32;;
+let dore = rgb 255 215 0;;
+
+(* Fonction "in bounds" *)
+let in_bounds = fun x -> -1 < x && x < 4;;
+
+(* Fonction pour déterminer les puissances de 2 *)
+let rec is_pow n = match n with
+  |m when m=1 || m=0 -> true
+  |m when (m mod 2) = 1 -> false
+  |_ -> is_pow (n/2);;
+
+(* Dernier chiffre d'un float *)
+let last_digit_float x =
+  let s = string_of_float x in
+  let len = string_length s in
+  s.[len - 1];;
+
+(* Fonction pour copier une matrice *)
+let copy_mat g h = 
+  let n = vect_length g in
+  for i=0 to n-1 do
+    for j=0 to n-1 do
+      h.(i).(j) <- g.(i).(j)
+    done;
+  done;;
+
+(* Fonction pour comparer des matrices *)
+let comp_mat g h = 
+  let m = vect_length g and n = vect_length(g.(0)) in
+  let p = vect_length g and q = vect_length(g.(0)) in
+  let v = ref true in
+  if m <> p || n <> q then begin 
+    v := false;
+    !v;
+  end
+  else
+    let i = ref 0 in
+    while !i < m do
+      let j = ref 0 in
+      while !j < n do
+        if g.(!i).(!j) <> h.(!i).(!j) then begin v := false; i:= m; j:= n end;
+        j := !j + 1;
+      done;
+      i := !i + 1;
+    done;
+    !v;;
+
+(* Fonction d'addition de vecteur *)
+let add_vect x y =
+  let n = vect_length(x) in
+  let z = make_vect n 0 in
+  for i=0 to n-1 do
+    z.(i) <- x.(i) + y.(i);
+  done;
+  z;;
+
+(* Tourner une matrice en sens horaire *)
+let clockwise g = 
+  let n = vect_length g in
+  let h = init_vect 4 (fun _ -> make_vect 4 0) in
+  for i=0 to n-1 do
+    for j=0 to n-1 do
+      h.(j).(n-1-i) <- g.(i).(j)
+    done;
+  done;
+  h;;
+
+(* Tourner une matrice en sens antihoraire *)
+let counterclock g = 
+  let n = vect_length g in
+  let h = init_vect 4 (fun _ -> make_vect 4 0) in
+  for i=0 to n-1 do
+    for j=0 to n-1 do
+      h.(n-1-j).(i) <- g.(i).(j)
+    done;
+  done;
+  h;;
+
+(* Fonction pour avoir les zéros d'une matrice *)
+let zeros g =
+  let l = ref [] in
+  let n = vect_length g in
+  for i=0 to n-1 do
+    for j=0 to n-1 do
+      if g.(i).(j) = 0 then begin l := (i, j) :: !l end;
+    done;
+  done;
+  vect_of_list !l;;
+
+(* Fonction de tassage *)
+let rec tassage g dx dy s =
+  if dy <> 0 && dx = 0 then begin
+    let i0 = 3 * (dy + 1) / 2 in
+    for m=0 to 2 do
+      let i = ref (((dy + 3) / 2) - (dy * m)) in
+      while !i <> i0 do
+        let v_i = copy_vect g.(!i) in
+        let v_idy = copy_vect g.(!i + dy) in
+        let v_t = add_vect v_i v_idy in
+        for n=0 to 3 do
+          if is_pow(v_t.(n)) then begin
+            if v_i.(n) = v_idy.(n) then begin
+              s := !s + v_i.(n);
+            end;
+          v_i.(n) <- 0;
+          end;
+          if not is_pow(v_t.(n)) then begin v_t.(n) <- (v_t.(n) - v_i.(n)) end;
+        done;
+        g.(!i) <- v_i;
+        g.(!i + dy) <- v_t;
+        i := !i + dy;
+      done;
+    done;
+  end;
+  if dx <> 0 && dy = 0 then begin
+    let h = clockwise g in
+    tassage h dy dx s;
+    copy_mat (counterclock h) g;
+  end;;
+
+(* Timer *)
+let timer x =
+  let t0 = time() in
+  while (time() -. t0) < x do
+    ()
+  done;;
+
+(* Choix des couleurs *)
+let cell_color n = match n with
+  |0 -> gris
+  |m when 1 < m && m < 5 -> white
+  |m when 4 < m && m < 65 -> bordeaux
+  |m when 64 < m && m < 8193 -> dore
+  |_ -> black;;
+
+(* Fonction principale *)
+let main =
+  (* Initialisation Fenêtre *)
+  open_graph "800x620";;
+
+  (* Tracé grille *)
+  for j=0 to 4 do
+    moveto 20 (20+100*j);
+    lineto 420 (20+100*j);
+  done;
+  for i=0 to 4 do
+    moveto (20+100*i) 20;
+    lineto (20+100*i) 420;
+  done;
+
+  (* Credits et instructions*)
+  moveto 150 460;
+  draw_string "2048 in Caml Light";
+  moveto 180 440;
+  draw_string "By FastGeek";
+  moveto 570 380;
+  draw_string "SCORE";
+  moveto 460 270;
+  draw_string "Use WASD or Numpad 8426 to move.";
+  moveto 440 200;
+  draw_string "In the one hand, Caml is a programming";
+  moveto 440 180;
+  draw_string "language that is obsolete since 2002.";
+  moveto 440 160;
+  draw_string "In the other hand, 2048 is a pretty";
+  moveto 440 140;
+  draw_string "popular game created in 2014 and that";
+  moveto 440 120;
+  draw_string "has been ported to many platforms";
+  moveto 440 100;
+  draw_string "so far.";
+  moveto 520 40;
+  draw_string "Press [ESC] to exit";
+
+  (* Initialisation grille et copie *)
+  let G = init_vect 4 (fun _ -> make_vect 4 0) in
+  let G_bis = init_vect 4 (fun _ -> make_vect 4 0) in
+
+  (* Tuile de départ *)
+  let zG = ref (zeros G) in
+  let l0 = vect_length (!zG) in
+  let tm = ref (time() *. (random__float 49.0)) in
+  let rd = ref (int_of_float(!tm) mod l0) in
+  G.(fst !zG.(!rd)).(snd !zG.(!rd)) <- 2 * (1 + (int_of_float(!tm) mod 2));
+
+  (* Initialisation touche *)
+  let K = ref ` ` in
+  let S = ref 0 and S_bis = ref 0 in
+  let dx = ref 0 and dy = ref 0 in
+
+  (* Game Over *)
+  let game_over = ref true in
+
+  (* Mouvements *)
+  let moves = [|(0, 1); (0, -1); (1, 0); (-1, 0)|] in
+  let mv_id = ref 0 in
+
+  (* Boucle principale *)
+  while !K <> `\027` do
+
+    (* Tuile aléatoire *)
+    zG := zeros G;
+    let l0 = vect_length (!zG) in
+    tm := time() *. (random__float 49.0);
+    if l0 <> 0 then begin
+      rd := int_of_float(!tm) mod l0;
+      G.(fst !zG.(!rd)).(snd !zG.(!rd)) <- 2 * (1 + (int_of_float(!tm) mod 2));
+    end;
+
+    (* Affichage grille *)
+    for i=0 to 3 do
+      for j=0 to 3 do
+        let n = G.(j).(i) in
+        let m = string_of_int n in
+        let l = string_length m in
+        let x = (21+100*i) and y = (21+100*(3-j)) in
+        set_color (cell_color n);
+        fill_rect x y 99 99;
+        if n > 0 then begin
+          moveto (x+49-8*l/2) (y+40);
+          set_color black;
+          draw_string m;
+        end;
+      done;
+    done;
+
+    (* Affichage score *)
+    let m = string_of_int !S in
+    let l = string_length m in
+    set_color white;
+    fill_rect 440 360 200 15;
+    set_color black;
+    moveto (590-8*l/2) 360;
+    draw_string m;
+
+    (* Ecoute des entrées des touches *)
+    K := read_key();
+    dx := 0; dy := 0;
+
+    (* Gestion des touches *)
+    if !K = `6` or !K = `D` or !K = `d` then begin
+      dx := 1; dy := 0
+    end;
+    if !K = `4` or !K = `A` or !K = `a` then begin
+      dx := -1; dy := 0
+    end;
+    if !K = `8` or !K = `W` or !K = `w` then begin
+      dx := 0; dy := -1
+    end;
+    if !K = `2` or !K = `S` or !K = `s` then begin
+      dx := 0; dy := 1
+    end;
+    
+    (* Tassage grille *)
+    tassage G !dx !dy S;
+
+    (* Verif Game Over *)
+    while !game_over && !mv_id < 4 do
+      copy_mat G G_bis;
+      tassage G_bis (fst moves.(!mv_id)) (snd moves.(!mv_id)) S_bis;
+      game_over := comp_mat G G_bis;
+      mv_id := !mv_id + 1;
+    done;
+    mv_id := 0;
+    if !game_over then begin 
+      set_color red;
+      moveto 554 240;
+      draw_string "GAME OVER";
+      timer 4.5;
+      K := `\027`;
+    end;
+
+    game_over := true;
+
+  done;
+
+  (* Fermeture fenêtre *)
+  if !K = `\027` then begin
+    close_graph();
+  end;
+
+main;;
